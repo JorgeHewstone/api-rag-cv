@@ -27,24 +27,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 2. (NUEVO) Configuración de Seguridad
-# Obtenemos la clave API secreta desde las variables de entorno de RunPod
-# Esta debe ser la MISMA clave que pones en .env.local de Vercel
-API_KEY_SECRET = os.environ.get("RUNPOD_API_KEY")
+# # 2. (NUEVO) Configuración de Seguridad
+# # Obtenemos la clave API secreta desde las variables de entorno de RunPod
+# # Esta debe ser la MISMA clave que pones en .env.local de Vercel
+# API_KEY_SECRET = os.environ.get("RUNPOD_API_KEY")
 
-if not API_KEY_SECRET:
-    print("ADVERTENCIA: No se ha configurado RUNPOD_API_KEY. La API no será segura.")
+# if not API_KEY_SECRET:
+#     print("ADVERTENCIA: No se ha configurado RUNPOD_API_KEY. La API no será segura.")
 
-# Función de dependencia para verificar la clave
-async def verify_api_key(authorization: str = Header(...)):
-    if not API_KEY_SECRET: # Permite el acceso si la clave no está configurada
-        return
+# # Función de dependencia para verificar la clave
+# async def verify_api_key(authorization: str = Header(...)):
+#     if not API_KEY_SECRET: # Permite el acceso si la clave no está configurada
+#         return
         
-    if authorization != f"Bearer {API_KEY_SECRET}":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Authorization header inválido o ausente."
-        )
+#     if authorization != f"Bearer {API_KEY_SECRET}":
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN, 
+#             detail="Authorization header inválido o ausente."
+#         )
 
 # --- Constantes del Modelo ---
 DB_PATH = "./vectorstore"
@@ -114,7 +114,7 @@ async def stream_rag_response(query: str) -> AsyncGenerator[str, None]:
 
 # --- Endpoint de la API ---
 # 3. (NUEVO) Añadimos la dependencia de seguridad
-@app.post("/stream-ask", dependencies=[Depends(verify_api_key)])
+@app.post("/stream-ask")
 async def ask_question(request: ChatRequest):
     return StreamingResponse(
         stream_rag_response(request.query), 
