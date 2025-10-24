@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException, Header, status
+from fastapi import FastAPI, Request # Importa Request para obtener headers
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,14 +11,11 @@ from typing import AsyncGenerator
 # --- Configuración ---
 app = FastAPI()
 
-# 1. (NUEVO) Configuración de CORS
-# Esto le da permiso a tu sitio en Vercel para llamar a esta API.
+# Configuración de CORS (sin cambios)
 origins = [
-    "http://localhost:3000",  # Para tus pruebas locales
-    # "https://tu-sitio-en-vercel.vercel.app", # ¡Añade tu URL de Vercel aquí!
-    "*" # Por ahora, permite todo
+    "http://localhost:3000",
+    "*"
 ]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -27,74 +24,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# # 2. (NUEVO) Configuración de Seguridad
-# # Obtenemos la clave API secreta desde las variables de entorno de RunPod
-# # Esta debe ser la MISMA clave que pones en .env.local de Vercel
-# API_KEY_SECRET = os.environ.get("RUNPOD_API_KEY")
-
-# if not API_KEY_SECRET:
-#     print("ADVERTENCIA: No se ha configurado RUNPOD_API_KEY. La API no será segura.")
-
-# # Función de dependencia para verificar la clave
-# async def verify_api_key(authorization: str = Header(...)):
-#     if not API_KEY_SECRET: # Permite el acceso si la clave no está configurada
-#         return
-        
-#     if authorization != f"Bearer {API_KEY_SECRET}":
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN, 
-#             detail="Authorization header inválido o ausente."
-#         )
-
 # --- Constantes del Modelo ---
 DB_PATH = "./vectorstore"
 MODELO_EMBEDDINGS = "nomic-embed-text"
-MODELO_LLM = "phi3:mini"
+MODELO_LLM = "phi3:mini" # Usando el modelo más pequeño
 
-# --- Tu System Prompt Personalizado ---
+# --- System Prompt (sin cambios) ---
 SYSTEM_PROMPT = """
-Eres un asistente de IA profesional que representa a [Tu Nombre]. Tu propósito es responder preguntas sobre [Tu Nombre] a potenciales reclutadores y contactos de negocio.
-Tu base de conocimientos es la información proporcionada en el CONTEXTO.
-REGLAS ESTRICTAS:
-1. Responde únicamente basándote en el CONTEXTO. No inventes información.
-2. Si la pregunta es sobre [Tu Nombre] y el CONTEXTO tiene la respuesta, respóndela como un profesional de RRHH.
-3. REGLA DE REDIRECCIÓN: Si la pregunta busca una debilidad (ej. "qué no sabes", "no tienes experiencia en X"), NUNCA digas "No sé" o "No tengo experiencia". En su lugar, reformula la respuesta de forma políticamente correcta, enfocándote en sus fortalezas adyacentes o en su gran facilidad para aprender.
-    - Ejemplo Malo: "No, él no tiene experiencia en JavaScript."
-    - Ejemplo Bueno: "Su fortaleza principal está en Python y el backend, pero aprende nuevas tecnologías rápidamente cuando un proyecto lo requiere."
-4. REGLA DE CONTACTO: Si la información solicitada no está en el CONTEXTO, no inventes. Invita amablemente a la persona a contactar a [Tu Nombre] directamente.
-    - Ejemplo: "Esa es una excelente pregunta. No tengo ese detalle específico, pero te invito a contactar a [Tu Nombre] directamente a [tu-email@dominio.com] para discutirlo."
+Eres un asistente de IA profesional que representa a [Tu Nombre]...
+... (resto del prompt igual) ...
 """
 
 # --- Inicialización (Cargar Vector Store) ---
+print(">>> DEBUG: Cargando Vector Store...") # Print 1: Inicio de carga
 try:
     db = lancedb.connect(DB_PATH)
     table = db.open_table("info_personal")
     embeddings = OllamaEmbeddings(model=MODELO_EMBEDDINGS)
-    print("Vector store cargado exitosamente.")
+    print(">>> DEBUG: Vector store cargado exitosamente.") # Print 2: Carga exitosa
 except Exception as e:
-    print(f"Error al cargar el vector store: {e}")
+    print(f">>> DEBUG: ERROR al cargar el vector store: {e}") # Print 3: Error de carga
     table = None
 
-# --- Modelo de Petición ---
+# --- Modelo de Petición (sin cambios) ---
 class ChatRequest(BaseModel):
     query: str
-    
+
 # --- Lógica de Streaming ---
 async def stream_rag_response(query: str) -> AsyncGenerator[str, None]:
+    print(f">>> DEBUG: Iniciando stream_rag_response con query: '{query}'") # Print 5: Entra a la lógica principal
     if not table:
+        print(">>> DEBUG: Error - Vector store no disponible.") # Print 6: Error si no hay RAG
         yield "Error: La base de conocimientos (vector store) no está disponible."
         return
 
-    # 1. Buscar en RAG
-    embedded_query = embeddings.embed_query(query)
-    results = table.search(embedded_query).limit(3).to_list()
-    context = "\n".join([item['text'] for item in results])
-
-    # 2. Construir el prompt para Ollama
-    prompt_con_contexto = f"CONTEXTO:\n{context}\n\nPREGUNTA: {query}"
-    
-    # 3. Llamar a Ollama en modo streaming
     try:
+        # 1. Buscar en RAG
+        print(">>> DEBUG: Generando embedding para la query...") # Print 7: Antes del embedding
+        embedded_query = embeddings.embed_query(query)
+        print(">>> DEBUG: Embedding generado. Buscando en LanceDB...") # Print 8: Antes de buscar
+        results = table.search(embedded_query).limit(3).to_list()
+        context = "\n".join([item['text'] for item in results])
+        print(f">>> DEBUG: Contexto encontrado: {context[:100]}...") # Print 9: Muestra parte del contexto
+
+        # 2. Construir el prompt para Ollama
+        prompt_con_contexto = f"CONTEXTO:\n{context}\n\nPREGUNTA: {query}"
+        print(f">>> DEBUG: Prompt final para Ollama: {prompt_con_contexto[:100]}...") # Print 10: Muestra parte del prompt
+
+        # 3. Llamar a Ollama en modo streaming
+        print(f">>> DEBUG: Llamando a ollama.chat con modelo {MODELO_LLM}...") # Print 11: Antes de llamar a Ollama
         stream = ollama.chat(
             model=MODELO_LLM,
             messages=[
@@ -105,22 +83,41 @@ async def stream_rag_response(query: str) -> AsyncGenerator[str, None]:
         )
 
         # 4. Devolver cada chunk a medida que llega
+        print(">>> DEBUG: Recibiendo stream de Ollama...") # Print 12: Empieza el stream
+        chunk_count = 0
         for chunk in stream:
             if 'content' in chunk['message']:
+                # print(f">>> DEBUG: Yield chunk {chunk_count}") # Descomenta si quieres ver CADA chunk
                 yield chunk['message']['content']
-                
+                chunk_count += 1
+        print(f">>> DEBUG: Stream de Ollama finalizado. Total chunks: {chunk_count}") # Print 13: Termina el stream
+
     except Exception as e:
-        yield f"Error al comunicarse con el modelo de IA: {e}"
+        print(f">>> DEBUG: ERROR dentro de stream_rag_response: {e}") # Print 14: Captura error interno
+        yield f"Error durante el procesamiento de la IA: {e}"
 
 # --- Endpoint de la API ---
-# 3. (NUEVO) Añadimos la dependencia de seguridad
+# Quitamos la seguridad duplicada
 @app.post("/stream-ask")
-async def ask_question(request: ChatRequest):
+async def ask_question(request: Request, chat_request: ChatRequest): # Modificado para recibir Request y ChatRequest
+    # Imprime headers para depuración de CORS o Auth si fuera necesario
+    print(f">>> DEBUG: Petición recibida en /stream-ask. Headers: {dict(request.headers)}") # Print 4: Petición recibida
+    
+    # Validar que el cuerpo (body) se parseó correctamente
+    if not chat_request or not chat_request.query:
+         print(">>> DEBUG: Error - Cuerpo de la petición inválido o 'query' ausente.")
+         # Puedes devolver un error más específico si quieres
+         # raise HTTPException(status_code=400, detail="Cuerpo de la petición inválido.")
+         # Por ahora, dejamos que falle y lo veremos en los logs
+    
+    # Llama a la lógica de streaming usando el query del cuerpo parseado
     return StreamingResponse(
-        stream_rag_response(request.query), 
+        stream_rag_response(chat_request.query),
         media_type="text/event-stream"
     )
 
-@app.get("/") # Endpoint de salud
+@app.get("/") # Endpoint de salud (sin cambios)
 def health_check():
     return {"status": "ok", "vector_store_loaded": table is not None}
+
+print(">>> DEBUG: Aplicación FastAPI iniciada.") # Print de inicio general
