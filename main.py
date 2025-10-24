@@ -49,7 +49,7 @@ app.add_middleware(
 # --- Constantes del Modelo ---
 DB_PATH = "./vectorstore"
 MODELO_EMBEDDINGS = "nomic-embed-text"
-MODELO_LLM = "llama3.1:8b"
+MODELO_LLM = "phi3:mini"
 
 # --- Tu System Prompt Personalizado ---
 SYSTEM_PROMPT = """
