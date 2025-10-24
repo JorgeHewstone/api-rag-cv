@@ -18,20 +18,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 6. Copiar todo el código de la API
 COPY . .
 
-# 7. Ejecutar el script para construir el Vector Store
-# Primero iniciamos Ollama en segundo plano y le damos tiempo
-# Luego pre-descargamos los modelos y construimos el RAG
-RUN (ollama serve & \
-     sleep 10 && \
-     ollama pull ${MODELO_EMBEDDINGS:-nomic-embed-text} && \
-     ollama pull ${MODELO_LLM:-llama3.1:8b} && \
-     python rag_builder.py \
-    ) || (cat /root/.ollama/logs/server.log && exit 1)
+# 7. (NUEVO) Dar permisos al script de build y al de start
+COPY build.sh .
+COPY start.sh .
+RUN chmod +x build.sh
+RUN chmod +x start.sh
 
-# 8. Exponer el puerto
+# 8. (NUEVO) Ejecutar el script de build (el que acabamos de crear)
+RUN ./build.sh
+
+# 9. Exponer el puerto
 EXPOSE 8080
 
-# 9. Script de inicio
-COPY start.sh .
-RUN chmod +x start.sh
+# 10. Script de inicio (este comando no cambia)
 CMD ["./start.sh"]
