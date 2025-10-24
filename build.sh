@@ -41,7 +41,7 @@ echo "--- Descargando modelo de embeddings: ${MODELO_EMBEDDINGS:-nomic-embed-tex
 ollama pull ${MODELO_EMBEDDINGS:-nomic-embed-text}
 
 # echo "--- Descargando modelo LLM: ${MODELO_LLM:-llama3.1:8b} ---"
-# ollama pull ${MODELO_LLM:-phi3:mini}
+ollama pull ${MODELO_LLM:-phi3:mini}
 
 echo "--- Ejecutando el script rag_builder.py... ---"
 python rag_builder.py
