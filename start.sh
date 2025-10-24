@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # 1. Inicia el servidor de Ollama en segundo plano
 ollama serve &

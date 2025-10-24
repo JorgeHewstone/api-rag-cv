@@ -1,48 +1,54 @@
-#!/bin/sh
+#!/bin/bash
 
-# Inicia el servidor de Ollama en segundo plano
-echo "Iniciando Ollama en segundo plano..."
-ollama serve &
+# 1. MODO DEPURACIÓN: Imprime cada comando que se ejecuta
+set -x
 
-# Guarda el ID del proceso
+# 2. SANITY CHECK: Verifica que ollama esté instalado y dónde
+echo "--- Verificando la instalación de Ollama ---"
+which ollama
+ollama --version
+
+# 3. Inicia Ollama y REDIRIGE TODOS LOS LOGS a un archivo
+echo "--- Iniciando Ollama en segundo plano... ---"
+ollama serve > ollama.log 2>&1 &
 OLLAMA_PID=$!
 
-# Bucle de espera (más robusto que 'sleep')
-# Espera hasta 45 segundos a que Ollama esté listo
-echo "Esperando a que Ollama responda..."
+# 4. Bucle de espera (sin cambios, pero ahora veremos los logs de 'curl')
+echo "--- Esperando a que Ollama responda... ---"
 n=0
 while [ $n -lt 45 ]; do
-  # Comprueba si el servidor responde
-  status=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:11434)
-  
-  if [ $status -eq 200 ]; then
+  # Usamos 'curl -s ... | grep ...' como una prueba de éxito
+  if curl -s http://127.0.0.1:11434 | grep "Ollama is running"; then
     echo "Ollama está listo."
     break
   fi
   
-  echo "Ollama no está listo (Status: $status). Esperando 1s..."
+  echo "Ollama no está listo. Esperando 1s..."
   sleep 1
   n=$((n+1))
 done
 
-# Si el bucle termina sin éxito, falla el build
+# 5. Si falla, imprime los logs que capturamos
 if [ $n -eq 45 ]; then
-  echo "Error: Ollama no pudo iniciarse después de 45 segundos."
-  echo "--- Logs de Ollama ---"
-  cat /root/.ollama/logs/server.log
+  echo "--- ERROR: Ollama no pudo iniciarse después de 45 segundos. ---"
+  echo "--- Mostrando los logs de ollama.log ---"
+  cat ollama.log
   exit 1
 fi
 
-# Si todo va bien, continúa con las descargas y el build del RAG
-echo "Descargando modelo de embeddings: ${MODELO_EMBEDDINGS:-nomic-embed-text}"
+# 6. Si todo va bien, continúa
+echo "--- Descargando modelo de embeddings: ${MODELO_EMBEDDINGS:-nomic-embed-text} ---"
 ollama pull ${MODELO_EMBEDDINGS:-nomic-embed-text}
 
-echo "Descargando modelo LLM: ${MODELO_LLM:-llama3.1:8b}"
+echo "--- Descargando modelo LLM: ${MODELO_LLM:-llama3.1:8b} ---"
 ollama pull ${MODELO_LLM:-llama3.1:8b}
 
-echo "Ejecutando el script rag_builder.py..."
+echo "--- Ejecutando el script rag_builder.py... ---"
 python rag_builder.py
 
-# Detiene el servidor de Ollama en segundo plano
-echo "Build de RAG completado. Deteniendo servidor Ollama temporal."
+# 7. Detiene el servidor
+echo "--- Build de RAG completado. Deteniendo servidor Ollama temporal. ---"
 kill $OLLAMA_PID
+
+# Desactiva el modo de depuración al final
+set +x
