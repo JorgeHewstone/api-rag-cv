@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+ollama
+langchain
+langchain-community
+lancedb
+langchain-ollama
+sentence-transformers

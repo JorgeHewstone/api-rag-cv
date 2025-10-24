@@ -1,0 +1,20 @@
+Información sobre Jorge Hewstone Correa:
+
+Soy un Data Scientist y Desarrollador de IA con experiencia en Python, SQL y frameworks de Deep Learning como PyTorch. Mi fortaleza es crear sistemas de RAG (Retrieval-Augmented Generation) y optimizar modelos para inferencia.
+
+Proyectos Clave:
+- Sistema de Detección de Fraude: Usé un modelo XGBoost para analizar transacciones bancarias.
+- Chatbot de Soporte al Cliente: Desarrollé un sistema RAG con Llama 2 para responder preguntas sobre productos.
+
+Habilidades Técnicas:
+- Lenguajes: Python (experto), SQL (avanzado), JavaScript (intermedio)
+- IA/ML: PyTorch, LangChain, LlamaIndex, Ollama, Scikit-learn
+- DevOps: Docker, FastAPI, Git
+
+Educación:
+- Master en Neurorehabilitación.
+- Bootcamp en Data Science.
+
+Intereses:
+Me apasiona la neurociencia computacional y cómo los LLMs pueden modelar el lenguaje humano. Mi objetivo es aplicar la IA en el sector de la salud.
+
