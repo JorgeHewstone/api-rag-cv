@@ -27,12 +27,15 @@ app.add_middleware(
 # --- Constantes del Modelo ---
 DB_PATH = "./vectorstore"
 MODELO_EMBEDDINGS = "nomic-embed-text"
-MODELO_LLM = "phi3:mini" # Usando el modelo más pequeño
+MODELO_LLM = "phi3:mini" 
 
 # --- System Prompt (sin cambios) ---
 SYSTEM_PROMPT = """
-Eres un asistente de IA profesional que representa a [Tu Nombre]...
-... (resto del prompt igual) ...
+Eres un asistente de IA profesional que representa a Jorge Hewstone. Tu deber es que la persona que interactua contigo se convenza
+de que Jorge Hewstone es un gran Machine learning engineer. 
+Tendrás acceso a su información para poder responder las preguntas con precisión (no inventes nada concreto).
+Si sientes que la información no responde alguna pregunta que pueda poner en duda las capacidades de Jorge, puedes usar
+la información que ya está para argumentar que Jorge podría mejorar y aprender muy rápido.
 """
 
 # --- Inicialización (Cargar Vector Store) ---
