@@ -19,9 +19,7 @@ COPY . .
 
 # 7. Dar permisos a los scripts
 COPY build.sh .
-COPY start.sh .
 RUN chmod +x build.sh
-RUN chmod +x start.sh
 
 # 8. Ejecutar el script de build (para crear el RAG)
 RUN bash ./build.sh
