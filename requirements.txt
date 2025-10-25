@@ -1,8 +1,9 @@
-fastapi
-uvicorn[standard]
+fastapi # Lo dejamos por Pydantic (BaseModel), aunque no usemos el servidor
+# uvicorn[standard] # Ya no lo necesitamos
 ollama
 langchain
 langchain-community
 lancedb
 langchain-ollama
 sentence-transformers
+runpod # <-- AÑADE ESTA LÍNEA
