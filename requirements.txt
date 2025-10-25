@@ -6,4 +6,5 @@ langchain-community
 lancedb
 langchain-ollama
 sentence-transformers
-runpod # <-- AÑADE ESTA LÍNEA
+runpod 
+asyncio

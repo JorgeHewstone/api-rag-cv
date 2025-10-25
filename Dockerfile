@@ -13,7 +13,7 @@ WORKDIR /app
 # 5. Instalar dependencias de Python (AHORA INCLUYE runpod)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
+RUN echo ">>> Python dependencies installed. Copying application code. <<<"
 # 6. Copiar todo el código de la API
 COPY . .
 
@@ -23,12 +23,9 @@ RUN chmod +x build.sh
 
 # 8. Ejecutar el script de build (para crear el RAG)
 RUN bash ./build.sh
-
+RUN echo ">>> Build.sh done. <<<"
 # 9. Exponer el puerto (RunPod lo ignora, pero es buena práctica)
 EXPOSE 8080
-
+RUN echo ">>> Starting command <<<"
 # 10. (CORREGIDO) Comando de inicio: EJECUTAR main.py
-# Ya no usamos start.sh ni uvicorn. runpod.serverless.start() maneja el servidor.
-# Necesitamos iniciar ollama serve en segundo plano ANTES de iniciar el handler.
 CMD ["python", "main.py"]
-# CMD bash -c "ollama serve & python main.py"

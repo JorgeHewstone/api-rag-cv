@@ -1,34 +1,132 @@
-
+print("--- SCRIPT main.py INICIADO ---") # Log inicial
 import runpod
-import time # Para simular trabajo
+import ollama
+import lancedb
+from langchain_ollama.embeddings import OllamaEmbeddings
+from pydantic import BaseModel, ValidationError
+from typing import AsyncGenerator
+import asyncio
+import subprocess # <-- Importar subprocess
+import time # <-- Importar time
+import sys # <-- Importar sys para ver la salida
 
-print(">>> DEBUG: Script main.py iniciado.")
+# --- Configuración y Carga de RAG (igual que antes) ---
+DB_PATH = "./vectorstore"
+MODELO_EMBEDDINGS = "nomic-embed-text"
+MODELO_LLM = "phi3:mini"
+SYSTEM_PROMPT = """
+Eres un asistente de IA profesional que representa a Jorge Hewstone. Tu deber es que la persona que interactua contigo se convenza
+de que Jorge Hewstone es un gran Machine learning engineer. 
+Tendrás acceso a su información para poder responder las preguntas con precisión (no inventes nada concreto).
+Si sientes que la información no responde alguna pregunta que pueda poner en duda las capacidades de Jorge, puedes usar
+la información que ya está para argumentar que Jorge podría mejorar y aprender muy rápido.
+"""
+print(">>> DEBUG: Cargando Vector Store...")
+try:
+    db = lancedb.connect(DB_PATH)
+    table = db.open_table("info_personal")
+    embeddings = OllamaEmbeddings(model=MODELO_EMBEDDINGS)
+    print(">>> DEBUG: Vector store cargado exitosamente.")
+except Exception as e:
+    print(f">>> DEBUG: ERROR al cargar el vector store: {e}")
+    table = None
 
-# --- HANDLER ULTRA SIMPLIFICADO ---
-def handler(job):
-    """
-    Función mínima para ver si RunPod la ejecuta.
-    """
-    # Print 1: ¿Llegó la petición al handler?
-    print(f">>> DEBUG: Job recibido por el handler: {job}")
+# --- Modelo de Petición ---
+class ChatRequest(BaseModel):
+    query: str
 
-    job_input = job.get('input', {})
-    query = job_input.get('query', 'No query found')
+# --- Lógica de Streaming (igual que antes, con AsyncClient) ---
+async def stream_rag_response(query: str) -> AsyncGenerator[str, None]:
+    print(f">>> DEBUG: Iniciando stream_rag_response con query: '{query}'")
+    if not table:
+        print(">>> DEBUG: Error - Vector store no disponible.")
+        yield "Error: La base de conocimientos (vector store) no está disponible."
+        return
+    try:
+        # ... (Lógica RAG igual) ...
+        print(">>> DEBUG: Generando embedding...")
+        embedded_query = embeddings.embed_query(query)
+        print(">>> DEBUG: Buscando en LanceDB...")
+        results = table.search(embedded_query).limit(3).to_list()
+        context = "\n".join([item['text'] for item in results])
+        prompt_con_contexto = f"CONTEXTO:\n{context}\n\nPREGUNTA: {query}"
+        print(f">>> DEBUG: Llamando a ollama.chat con modelo {MODELO_LLM}...")
+        
+        # Usamos AsyncClient
+        stream = await ollama.AsyncClient().chat(
+            model=MODELO_LLM,
+            messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt_con_contexto},
+            ],
+            stream=True
+        )
+        print(">>> DEBUG: Recibiendo stream de Ollama...")
+        chunk_count = 0
+        async for chunk in stream:
+             if 'message' in chunk and 'content' in chunk['message']:
+                yield chunk['message']['content']
+                chunk_count += 1
+        print(f">>> DEBUG: Stream de Ollama finalizado. Total chunks: {chunk_count}")
 
-    # Print 2: ¿Pudimos extraer algo del input?
-    print(f">>> DEBUG: Query extraída (o por defecto): '{query}'")
+    except Exception as e:
+        print(f">>> DEBUG: ERROR dentro de stream_rag_response: {e}")
+        yield f"Error durante el procesamiento de la IA: {e}"
 
-    # Simula un pequeño trabajo
-    time.sleep(1)
+# --- EL HANDLER HTTP DE RUNPOD (igual que antes) ---
+async def handler_http(job):
+    print(f">>> DEBUG: Job HTTP recibido: {job}")
+    job_input = job.get('input', None)
+    # ... (Validación Pydantic igual) ...
+    try:
+        chat_request = ChatRequest(**job_input)
+        print(f">>> DEBUG: Input validado: query='{chat_request.query}'")
+    except ValidationError as e:
+        print(f">>> DEBUG: Error de validación de input: {e}")
+        return {"error": f"Input inválido: {e}"}
 
-    # Devuelve una respuesta simple (NO streaming por ahora)
-    response = f"Handler recibió: {query}"
-    print(f">>> DEBUG: Devolviendo respuesta: '{response}'") # Print 3: ¿Llegamos al final?
-    return {"output": response} # Runpod espera un diccionario
+    return {"output": stream_rag_response(chat_request.query)}
 
-# --- Iniciar el Worker de RunPod ---
-print(">>> DEBUG: Iniciando worker de RunPod...")
-runpod.serverless.start({"handler": handler})
+# --- Iniciar Ollama y luego el Worker de RunPod ---
+def start_ollama():
+    print(">>> DEBUG: Intentando iniciar 'ollama serve' en segundo plano...")
+    # Redirigir stdout y stderr a archivos para depuración si es necesario
+    try:
+        # Usamos Popen para no bloquear
+        process = subprocess.Popen(["ollama", "serve"], stdout=sys.stdout, stderr=sys.stderr) 
+        print(f">>> DEBUG: Proceso 'ollama serve' iniciado con PID: {process.pid}")
+        # Espera corta para darle tiempo a iniciar
+        time.sleep(5) 
+        # Podríamos añadir un bucle de chequeo aquí si 5s no es suficiente
+        return process
+    except FileNotFoundError:
+        print(">>> DEBUG: ERROR - El comando 'ollama' no se encontró. ¿Está instalado?")
+        return None
+    except Exception as e:
+        print(f">>> DEBUG: ERROR al iniciar 'ollama serve': {e}")
+        return None
+
+if __name__ == "__main__":
+    ollama_process = start_ollama()
+    if ollama_process:
+        print(">>> DEBUG: Ollama iniciado. Asegurando modelos...")
+        # Aseguramos que los modelos estén disponibles al inicio
+        try:
+            # Usamos el cliente síncrono aquí porque es más simple al inicio
+            ollama.pull(MODELO_EMBEDDINGS)
+            ollama.pull(MODELO_LLM)
+            print(">>> DEBUG: Modelos Ollama verificados/descargados.")
+        except Exception as e:
+            print(f">>> DEBUG: ERROR al hacer pull de modelos Ollama: {e}")
+            # Considera si quieres detenerte aquí si los modelos fallan
+
+        print(">>> DEBUG: Iniciando worker HTTP de RunPod...")
+        runpod.serverless.start({
+            "handler": handler_http,
+            "return_async": True
+        })
+    else:
+        print(">>> DEBUG: No se pudo iniciar Ollama. El worker de RunPod no se iniciará.")
 
 # Nota: No necesitamos iniciar 'ollama serve' para esta prueba mínima.
 # Lo quitaremos temporalmente del Dockerfile también.
