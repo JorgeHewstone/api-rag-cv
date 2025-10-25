@@ -30,4 +30,5 @@ EXPOSE 8080
 # 10. (CORREGIDO) Comando de inicio: EJECUTAR main.py
 # Ya no usamos start.sh ni uvicorn. runpod.serverless.start() maneja el servidor.
 # Necesitamos iniciar ollama serve en segundo plano ANTES de iniciar el handler.
-CMD bash -c "ollama serve & python main.py"
+CMD ["python", "main.py"]
+# CMD bash -c "ollama serve & python main.py"
